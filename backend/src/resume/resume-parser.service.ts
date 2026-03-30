@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
-import * as pdfParse from 'pdf-parse';
-import * as mammoth from 'mammoth';
+/* eslint-disable @typescript-eslint/no-var-requires */
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 export interface ParsedResume {
   skills: string[];

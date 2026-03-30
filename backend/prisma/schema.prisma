@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & User ─────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  fullName  String   @map("full_name")
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  resumes           Resume[]
+  jobDescriptions   JobDescription[]
+  interviewSessions InterviewSession[]
+
+  @@map("users")
+}
+
+// ─── Resume ──────────────────────────────────────────────────
+
+model Resume {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  fileType   String   @map("file_type")
+  rawText    String?  @map("raw_text")
+  parsedData Json?    @map("parsed_data")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis  ResumeAnalysis?
+  jdMatches JDMatch[]
+
+  @@map("resumes")
+}
+
+model ResumeAnalysis {
+  id              String   @id @default(uuid())
+  resumeId        String   @unique @map("resume_id")
+  overallScore    Float    @map("overall_score")
+  keywordScore    Float    @map("keyword_score")
+  formattingScore Float    @map("formatting_score")
+  experienceScore Float    @map("experience_score")
+  skillDensity    Float    @map("skill_density")
+  skills          Json     @default("[]")
+  experience      Json     @default("[]")
+  education       Json     @default("[]")
+  projects        Json     @default("[]")
+  suggestions     Json     @default("[]")
+  weaknesses      Json     @default("[]")
+  strengths       Json     @default("[]")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("resume_analyses")
+}
+
+// ─── JD Matching ─────────────────────────────────────────────
+
+model JobDescription {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  company     String?
+  description String
+  skills      Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches JDMatch[]
+
+  @@map("job_descriptions")
+}
+
+model JDMatch {
+  id            String   @id @default(uuid())
+  resumeId      String   @map("resume_id")
+  jdId          String   @map("jd_id")
+  matchScore    Float    @map("match_score")
+  matchedSkills Json     @default("[]") @map("matched_skills")
+  missingSkills Json     @default("[]") @map("missing_skills")
+  suggestions   Json     @default("[]")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  resume         Resume         @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobDescription JobDescription @relation(fields: [jdId], references: [id], onDelete: Cascade)
+
+  @@map("jd_matches")
+}
+
+// ─── Interview ───────────────────────────────────────────────
+
+model InterviewSession {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  resumeId     String?   @map("resume_id")
+  jdId         String?   @map("jd_id")
+  type         String    @default("mixed")
+  status       String    @default("in_progress")
+  overallScore Float?    @map("overall_score")
+  confidence   Float?
+  accuracy     Float?
+  clarity      Float?
+  feedback     Json?
+  startedAt    DateTime  @default(now()) @map("started_at")
+  endedAt      DateTime? @map("ended_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@map("interview_sessions")
+}
+
+model Question {
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  content    String
+  type       String
+  difficulty String   @default("medium")
+  orderIndex Int      @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  session InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answer  Answer?
+
+  @@map("questions")
+}
+
+model Answer {
+  id         String   @id @default(uuid())
+  questionId String   @unique @map("question_id")
+  content    String
+  score      Float?
+  feedback   String?
+  confidence Float?
+  accuracy   Float?
+  clarity    Float?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("answers")
+}

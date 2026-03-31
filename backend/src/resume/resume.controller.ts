@@ -8,7 +8,6 @@ import {
   UploadedFile,
   BadRequestException,
   ParseFilePipe,
-  FileTypeValidator,
   MaxFileSizeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -20,6 +19,22 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ResumeService } from './resume.service';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const ALLOWED_RESUME_MIME_TYPES = new Set<string>([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+function resumeFileFilter(
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: (error: Error | null, acceptFile: boolean) => void,
+) {
+  if (ALLOWED_RESUME_MIME_TYPES.has(file.mimetype)) {
+    return cb(null, true);
+  }
+  return cb(new BadRequestException('Only PDF and DOCX files are allowed'), false);
+}
 
 const storage = diskStorage({
   destination: './uploads/resumes',
@@ -34,17 +49,13 @@ export class ResumeController {
   constructor(private resumeService: ResumeService) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', { storage }))
+  @UseInterceptors(
+    FileInterceptor('file', { storage, fileFilter: resumeFileFilter }),
+  )
   async upload(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE }),
-          new FileTypeValidator({
-            fileType:
-              /(pdf|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/,
-          }),
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
       }),
     )
     file: Express.Multer.File,
